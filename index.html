@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>資料更新通知</title>
+    <!-- 引入 Bootstrap 5 -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- 引入 SweetAlert 2 -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <!-- 引入 Socket.IO -->
+    <script src="https://cdn.jsdelivr.net/npm/socket.io-client@4.5.4/dist/socket.io.min.js"></script>
+
+    <style>
+        .btn-custom {
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-5">
+        <h1 class="text-center mb-4">任務申請資料通知</h1>
+
+        <!-- 資料表格區 -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title">待處理資料表</h5>
+            </div>
+            <div class="card-body">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>行號</th>
+                            <th>資料</th>
+                            <th>狀態</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="pending-data-table">
+                        <!-- 待處理資料行會顯示在這裡 -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 連接到 Socket.IO 伺服器
+        const socket = io.connect('http://' + document.domain + ':' + location.port);
+
+        // 當接收到新資料時，更新表格
+        socket.on('new_data', function(data) {
+            console.log('接收到新資料:', data);
+            const rowData = data.data[data.data.length - 1];  // 取最後一筆資料
+            updatePendingDataTable(rowData);
+        });
+
+        // 更新資料表格顯示
+        function updatePendingDataTable(newData) {
+            const tableBody = document.getElementById('pending-data-table');
+
+            // 確保 newData 是物件，並且具有 data 屬性，且該屬性為陣列
+            if (typeof newData !== 'object' || !Array.isArray(newData.data)) {
+                console.error("newData 不是有效的物件或陣列: ", newData);
+                return;  // 停止執行
+            }
+
+            // 新資料加入表格
+            const row = document.createElement('tr');
+            const rowIndexCell = document.createElement('td');
+            const dataCell = document.createElement('td');
+            const statusCell = document.createElement('td');
+            const actionsCell = document.createElement('td'); // 動作欄位，放置按鈕
+
+            // 插入行號
+            rowIndexCell.textContent = newData.row_index;
+
+            // 這裡使用 newData.data 來加入資料
+            const item = newData.data;
+            dataCell.textContent = item.join(', ');  // 使用 join 將資料陣列轉為字串
+
+            statusCell.textContent = '等待處理'; // 初始狀態為"等待處理"
+
+            // 創建接受與拒絕按鈕
+            const acceptButton = document.createElement('button');
+            acceptButton.classList.add('btn', 'btn-success', 'btn-sm');
+            acceptButton.textContent = '接受';
+            acceptButton.onclick = function() {
+                handleAccept(newData.row_index);
+            };
+
+            const rejectButton = document.createElement('button');
+            rejectButton.classList.add('btn', 'btn-danger', 'btn-sm');
+            rejectButton.textContent = '拒絕';
+            rejectButton.onclick = function() {
+                handleReject(newData.row_index);
+            };
+
+            // 將按鈕加入動作欄位
+            actionsCell.appendChild(acceptButton);
+            actionsCell.appendChild(rejectButton);
+
+            // 將單元格加入行
+            row.appendChild(rowIndexCell);
+            row.appendChild(dataCell);
+            row.appendChild(statusCell);
+            row.appendChild(actionsCell); // 加入動作欄位
+
+            // 將行添加到表格中
+            tableBody.appendChild(row);
+        }
+
+        // 處理接受資料的邏輯
+        function handleAccept(rowIndex) {
+            alert('您已接受資料，行號: ' + rowIndex);
+            socket.emit('accept_data', { 'row_index': rowIndex });
+            removeRowFromTable(rowIndex);
+        }
+
+        // 處理拒絕資料的邏輯
+        function handleReject(rowIndex) {
+            alert('您已拒絕資料，行號: ' + rowIndex);
+            socket.emit('reject_data', { 'row_index': rowIndex });
+            removeRowFromTable(rowIndex);
+        }
+
+        // 從表格移除資料
+        function removeRowFromTable(rowIndex) {
+            const table = document.getElementById('pending-data-table');
+            const rows = table.getElementsByTagName('tr');
+            
+            // 遍歷所有行，查找對應行號的行
+            for (let i = 0; i < rows.length; i++) {
+                const row = rows[i];
+                const rowIdxCell = row.cells[0]; // 假設行號在第 1 列 (即 index 0)
+                if (rowIdxCell && rowIdxCell.textContent == rowIndex) {
+                    table.deleteRow(i); // 刪除找到的行
+                    break;
+                }
+            }
+        }
+    </script>
+
+    <!-- 引入 Bootstrap 5 JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

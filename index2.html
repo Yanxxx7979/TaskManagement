@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>資料更新通知</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdn.jsdelivr.net/npm/socket.io-client@4.5.4/dist/socket.io.min.js"></script>
+    <style>
+        .btn-container {
+            margin-bottom: 5px;
+            display: flex;
+            justify-content: flex-end; /* 改成靠右對齊 */
+            gap: 10px;
+        }
+        th, td {
+            text-align: center;
+            padding: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-5">
+        <h1 class="text-center mb-4">任務申請資料通知</h1>
+        <div class="btn-container">
+            <button class="btn btn-primary btn-lg" onclick="missionsheet()">GoogleSheet查看任務清單</button>
+            <button class="btn btn-secondary btn-lg" onclick="missionrequest()">NAS中查看任務需求</button>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title">待處理資料表</h5>
+            </div>
+            <div class="card-body">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>行號</th>
+                            <th>申請人</th>
+                            <th>專案名稱</th>
+                            <th>任務類型</th>
+                            <th>細節</th>
+                            <th>任務補充</th>
+                            <th>時間安排</th>
+                            <th>緊急原因</th>
+                            <th>開始時間</th>
+                            <th>Deadline</th>
+                            <th>困難度</th>
+                            <th>補充</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="pending-data-table"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const socket = io.connect('http://' + document.domain + ':' + location.port);
+
+        // 存儲已顯示的行號，避免重複
+        const displayedRows = new Set();
+
+        // 接收新資料並更新表格
+        socket.on('new_data', function(data) {
+            console.log('接收到新資料:', data);
+            const newRecords = data.data;
+            newRecords.forEach(record => {
+                // 確保行號不重複顯示
+                if (!displayedRows.has(record.row_index)) {
+                    displayedRows.add(record.row_index); // 記錄行號
+                    updatePendingDataTable(record);     // 更新表格
+                }
+            });
+        });
+
+        // 更新表格函數
+        function updatePendingDataTable(newData) {
+            const tableBody = document.getElementById('pending-data-table');
+            const row = document.createElement('tr');
+
+            // 使用逗號將新資料分隔成不同欄位
+            const fields = newData.data.join(',').split(',');
+
+            row.innerHTML = `
+                <td>${newData.row_index}</td>
+                <td>${fields[0]}</td>
+                <td>${fields[1]}</td>
+                <td>${fields[2]}</td>
+                <td>${fields[3]}</td>
+                <td>${fields[4]}</td>
+                <td>${fields[5]}</td>
+                <td>${fields[6]}</td>
+                <td>${fields[7]}</td>
+                <td>${fields[8]}</td>
+                <td>${fields[9]}</td>
+                <td>${fields[10]}</td>
+                <td>
+                    <button class="btn btn-success btn-sm" onclick="handleAccept(${newData.row_index})">接受</button>
+                    <button class="btn btn-danger btn-sm" onclick="handleReject(${newData.row_index})">拒絕</button>
+                </td>
+            `;
+            tableBody.appendChild(row);
+        }
+
+        // 接受資料的功能
+        function handleAccept(rowIndex) {
+            Swal.fire('接受資料成功', `您已接受資料，行號: ${rowIndex}`, 'success');
+            socket.emit('accept_data', { row_index: rowIndex });
+            removeRowFromTable(rowIndex);
+        }
+
+        // 拒絕資料的功能
+        function handleReject(rowIndex) {
+            Swal.fire('拒絕資料', `您已拒絕資料，行號: ${rowIndex}`, 'error');
+            socket.emit('reject_data', { row_index: rowIndex });
+            removeRowFromTable(rowIndex);
+        }
+
+        // 從表格中移除指定行
+        function removeRowFromTable(rowIndex) {
+            const rows = document.getElementById('pending-data-table').querySelectorAll('tr');
+            rows.forEach(row => {
+                if (row.cells[0].textContent == rowIndex) {
+                    row.remove();
+                    displayedRows.delete(rowIndex); // 從顯示記錄中移除
+                }
+            });
+        }
+
+        // 查看 Google Sheet 的按鈕功能
+        function missionsheet() {
+            window.location.href = 'https://docs.google.com/spreadsheets/d/1Zs_I8c9pPyUEmiMcH4rn29vtd35BN9mfAa1qBwsdkoY/edit?gid=958590515#gid=958590515';
+        }
+
+        // 查看 NAS 任務需求的按鈕功能
+        function missionrequest() {
+            window.location.href = 'http://leda-office.synology.me/?launchApp=SYNO.SDS.Drive.Application#file_id=825020314846019331';
+        }
+    </script>
+</body>
+</html>
